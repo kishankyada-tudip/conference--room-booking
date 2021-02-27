@@ -39,9 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework.authtoken',
     'rest_framework',
-    # 'booking.apps.BookingConfig',
-    # 'rest_framework_swagger',
-    'booking'
+    'booking.apps.BookingConfig',
+    'rest_framework_swagger',
 ]
 
 REST_FRAMEWORK = {

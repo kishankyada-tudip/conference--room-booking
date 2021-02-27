@@ -1,22 +1,20 @@
 from rest_framework import generics, authentication, permissions, status, viewsets
-from booking.serializers import UserSerializers, BookSerializer, RoomSerializer
+from booking.serializers import UserSerializers, SlotSerializer, RoomSerializer
 from django.contrib.auth import authenticate,login,logout, get_user_model
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authtoken.models import Token
 from rest_framework.settings import api_settings
 from rest_framework.response import Response
-from booking.models import User,Room,Book
+from booking.models import User,Room,Slot
 from rest_framework.views import APIView
 from django.http import JsonResponse
 from datetime import date
     
 class UserRegisterApi(generics.CreateAPIView):
-    """Use to register the user and automatically it will generate a token for that user."""
     authentication_classes = ()
     permission_classes = ()
     serializer_class = UserSerializers
-
 
 class LoginView(APIView):
     permission_classes = ()
@@ -27,11 +25,9 @@ class LoginView(APIView):
         if user:
             return Response({"token": user.auth_token.key})
         else:
-            return Response({"error": "Wrong Credentials"}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response({"message": "Wrong Credentials"}, status=status.HTTP_400_BAD_REQUEST)
         
 class LogoutApi(APIView):
-    """Use to logout the user"""
     def post(self, request):
         return self.logout(request)
 
@@ -42,170 +38,291 @@ class LogoutApi(APIView):
             pass
         logout(request)
         return Response({"success": "Successfully logged out."},status=status.HTTP_200_OK)
- 
-
-# Listing, Create, Update, Delete room api Start
-class SpecificRoomListingApi(viewsets.ModelViewSet):
-    """Retrieve the room detail data based on user authentication if is_admin = True it will return all room else it will return specific room created by employees."""
-    serializer_class = RoomSerializer
-    queryset = Room.objects.all().order_by("-id")
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
     
-    
-
-class CreateRoomApis(APIView):
-    """Use to create and List new room"""
-    
+class RoomView(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
+    
     def post(self,request):
         if request.user.is_authenticated:
-            caption = request.data.get("caption")
-            capacity = request.data.get("capacity")
-            user = User.objects.filter(id=request.user.id)
-            if user[0].is_admin == True:
-                room = Room.objects.create(user=user[0],caption=caption, capacity=capacity)
+            name = request.data.get("name")
+            description = request.data.get("description")
+            if request.user.is_admin == True:
+                room = Room.objects.create(name=name, description=description)
                 return JsonResponse({"id":room.id,
-                                     "user":room.user.id,
-                                     "caption":room.caption,
-                                     "capacity":room.capacity,
-                                     "creted_date":room.created_date,
-                                     "modified_date":room.modified_date},status=status.HTTP_201_CREATED)
+                                     "name":room.name,
+                                     "description":room.description,
+                                     "messsage":"room created successfully"},status=status.HTTP_201_CREATED)
             else:
-                return JsonResponse({"error":"You are not authorized to book this conference room as you are not an admin."})
-  
-# Listing, Create, Update, Delete Booking api start
-class ConferenceRoomDetailListingApi(viewsets.ModelViewSet):
-    """Retrieve the booking detail of conference room data based on user authentication if is_admin = True it will return all booked room else it will return specific room booked by employees."""
-    serializer_class = BookSerializer
-    queryset = Book.objects.all().order_by("-id")
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
-    
-
-class DeleteBookDetailApi(APIView):
+                return JsonResponse({"message":"you are not authorize to create this room."})
+        else:
+            return JsonResponse({"message":"You are not authorize!"}, status= status.HTTP_401_UNAUTHORIZED)
+                    
+    def get(self,request):
+        if request.user.is_authenticated:
+            data = []
+            search_room =  self.request.query_params.get("search_room")
+            if search_room:
+                room = Room.objects.filter(name__icontains=search_room)
+                for i in room:
+                    response = {"id":i.id,
+                                "name":i.name,
+                                "description":i.description,
+                                "created_date":i.created_date}
+                    data.append(response)
+                return JsonResponse(data, safe=False)
+            else:
+                room = Room.objects.all().order_by("-id")
+                for i in room:
+                    response = {"id":i.id,
+                                "name":i.name,
+                                "description":i.description,
+                                "created_date":i.created_date}
+                    data.append(response)
+                return JsonResponse(data, safe=False)
+        else:
+            return JsonResponse({"message":"You are not authorize!"}, status= status.HTTP_401_UNAUTHORIZED)
+        
+class RoomDetailView(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
-    """Use to delete booked room if authenticated user is True then it will delete all the  booked room else it won't delete all rooms."""
+    
+    def get(self,request,pk):
+        if request.user.is_authenticated:
+            data = []
+            room = Room.objects.filter(pk=pk)
+            if room:
+                response = {"id":room[0].id,
+                            "name":room[0].name,
+                            "description":room[0].description,
+                            "created_date":room[0].created_date}
+                data.append(response)
+                return JsonResponse(data, safe=False)
+            else:
+                return JsonResponse({"message":"room does not exist"})
+        else:
+            return JsonResponse({"message":"You are not authorize!"}, status= status.HTTP_401_UNAUTHORIZED)
+        
     def delete(self,request,pk):
         if request.user.is_authenticated:
-            book = Book.objects.filter(pk=pk)
-            if book:
-                book.delete()
-                return JsonResponse({"message":"Booked room deleted successfully"},status=status.HTTP_204_NO_CONTENT)
-            else:
-                return JsonResponse({"message":"Something went wrong!"},status=status.HTTP_400_BAD_REQUEST)
-        else:
-            return JsonResponse({"error": "You are not authorized!"}, status=status.HTTP_401_UNAUTHORIZED) 
-            
-class UpdateBookDetailApi(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
-    permission_classes = [permissions.IsAuthenticated]
-    """use to update the booked room if authenticated user is True then it will update all the  booked room else it won't update all rooms."""
-    def put(self,request,pk):
-        if request.user.is_authenticated:
-            # user = User.objects.filter(id=request.user.id)
-            book = Book.objects.filter(pk=pk)
-            if book:
-                serializer = BookSerializer(book[0], data=request.data)
-                if serializer.is_valid():
-                    serializer.save()
-                    serializer_dict = serializer.data
-                    serializer_dict["message"] = "Booked room updated successfully."
-                    return Response(serializer_dict)
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                return JsonResponse({"message":"something went wrong"},status=status.HTTP_400_BAD_REQUEST)
-        else:
-            return JsonResponse({"error": "You are not authorized!"}, status=status.HTTP_401_UNAUTHORIZED)
-        
-class UpdateEmployeeBookDetailApi(APIView):
-    authentication_classes = [authentication.TokenAuthentication]
-    permission_classes = [permissions.IsAuthenticated]
-    def put(self,request,pk):
-        if request.user.is_authenticated:
-            start_time = request.data.get("start_time")
-            end_time = request.data.get("end_time")
-            if start_time >= end_time:
-                return JsonResponse({"error": "End time must be greater tha start time"}, status=status.HTTP_401_UNAUTHORIZED)
-            else:
-                booked_room = Book.objects.filter(is_active=True,pk=pk)
-                if booked_room:
-                    booked_room.update(start_time=start_time,end_time=end_time,is_active=False)
-                    return JsonResponse({"message":"Time slot for the booked room updated successfully"},status=status.HTTP_201_CREATED)
+            if request.user.is_admin == True:
+                room = Room.objects.filter(pk=pk)
+                if room:
+                    room.delete()
+                    return JsonResponse({"message":"Room deleted successfully"}, status= status.HTTP_204_NO_CONTENT)
                 else:
-                    return JsonResponse({"message":"Room is already reserved"},status=status.HTTP_400_BAD_REQUEST)
+                    return JsonResponse({"message":"Room does not exist."})
+            else:
+                return JsonResponse({"message":"You are not authorized to delete this room."},status = status.HTTP_401_UNAUTHORIZED)
         else:
-            return JsonResponse({"error": "You are not authorized!"}, status=status.HTTP_401_UNAUTHORIZED)
+            return JsonResponse({"message":"You are not authorize!"}, status= status.HTTP_401_UNAUTHORIZED)
         
-    
-class BookRoomWithValidationApi(APIView):
+    def put(self,request,pk):
+        if request.user.is_authenticated:
+            name = request.data.get("name")
+            description = request.data.get("description")
+            if request.user.is_admin == True:
+                room = Room.objects.filter(pk=pk)
+                if room:
+                    room.update(name=name, description=description)
+                    return JsonResponse({"id":room[0].id,
+                                        "name":room[0].name,
+                                        "description":room[0].description,
+                                        "message":"room updated successfully"})
+                else:
+                    return JsonResponse({"message":"room does not exist"})
+            else:
+                return JsonResponse({"message":"You are not authorized to delete this room."},status = status.HTTP_401_UNAUTHORIZED)
+        else:
+            return JsonResponse({"message":"You are not authorize!"}, status= status.HTTP_401_UNAUTHORIZED)
+        
+class SlotView(APIView):
     authentication_classes = [authentication.TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
-    """Use to check the time slot validation, user validation and create a new conference room"""
+    
     def post(self,request):
         if request.user.is_authenticated:
             room_id = request.data.get("room_id")
             start_time = request.data.get("start_time")
             end_time = request.data.get("end_time")
-            users_ids = request.data.get("users_ids")
-            # time validation
-            if start_time >= end_time:
-                return JsonResponse({"error": "End time must be greater tha start time"}, status=status.HTTP_401_UNAUTHORIZED)
-            else:
-                ids = users_ids.split(',')
-                my_room = Room.objects.filter(id=room_id)
-                if len(ids) != my_room[0].capacity:
-                    return JsonResponse({"error": "You are giving users ids more than room capacity."}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            if request.user.is_admin == True:
+                if start_time >= end_time:
+                    return JsonResponse({"message":"start time cannot be greater then end time"})
                 else:
                     today_date = date.today().strftime("%Y-%m-%d")
-                    # user validation
-                    ids = users_ids.split(',')
-                    user_bookings = Book.objects.filter(start_time__gte=start_time, end_time__lte=end_time)
-                    if user_bookings:
-                        for i in user_bookings:
-                            book_id = i.users_ids.split(',')
-                            for b_id in book_id: 
-                                for m_id in ids:
-                                    if b_id == m_id:
-                                        user = User.objects.filter(id=m_id)
-                                        return JsonResponse({"error": user[0].name+" is already added in other room"}, status=status.HTTP_401_UNAUTHORIZED)
-                                
-                    books = Book.objects.filter(created_date=today_date,rooms_id=room_id,start_time__gte=start_time, end_time__lte=end_time)
-                    if len(books) != 0:
-                        return JsonResponse({"error": "Room is already reserved."}, status=status.HTTP_401_UNAUTHORIZED)                     
+                    slot = Slot.objects.filter(created_date=today_date,room_id=room_id,start_time__lte=start_time, end_time__gte=end_time)
+                    if len(slot) != 0:
+                        return JsonResponse({"message": "Time slot overlapping for the room"}, status=status.HTTP_400_BAD_REQUEST)
                     else:
                         user = User.objects.filter(id=request.user.id)
-                        if user[0].is_admin == True:
+                        if user[0]:
                             my_room = Room.objects.filter(id=room_id)
-                            books = Book.objects.create(user=user[0],rooms=my_room[0],start_time=start_time,end_time=end_time,users_ids=users_ids)
-                            if books:
-                                return JsonResponse({"id":books.id,
-                                                    "user_id":books.user.id,
-                                                    "rooms":books.rooms.id,
-                                                    "start_time":books.start_time,
-                                                    "end_time":books.end_time,
-                                                    "is_active":books.is_active,
-                                                    "user_ids":books.users_ids,
-                                                    "created_date":books.created_date,
-                                                    "modified_date":books.modified_date,
-                                                    "message": "Room created successfully"}, status=status.HTTP_201_CREATED)
+                            slots = Slot.objects.create(created_by=user[0],room=my_room[0],start_time=start_time,end_time=end_time)
+                            if slots:
+                                return JsonResponse({"id":slots.id,
+                                                     "user_id":slots.created_by.id,
+                                                     "room_id":slots.room.id,
+                                                     "start_date":slots.start_time,
+                                                     "end_date":slots.end_time,
+                                                     "is_available":slots.is_available,
+                                                     "message":"room booked successfully"},status=status.HTTP_201_CREATED)
                             else:
-                                return JsonResponse({"error": "Something went wrong"}, status=status.HTTP_400_BAD_REQUEST)
+                                return JsonResponse({"message":"Slot does not exist."})
                         else:
-                            return JsonResponse({"error": "You are not authorized to book this conference room as you are not an admin"}, status=status.HTTP_400_BAD_REQUEST)
+                            return JsonResponse({"message":"you don't have permission to book this room"})
+            else:
+                return JsonResponse({"message":"you are not authorize to create this slot"},status=status.HTTP_401_UNAUTHORIZED)
         else:
-            return JsonResponse({"error": "You are not authorized!"}, status=status.HTTP_401_UNAUTHORIZED)    
+            return JsonResponse({"message":"you are not authorized!!!"},status=status.HTTP_401_UNAUTHORIZED)
         
-# Listing, Create, Update, Delete Booking api End  
-class GetAllUserApi(viewsets.ModelViewSet):
-    """Get all users except passed token"""
-    serializer_class = UserSerializers
-    queryset = User.objects.all().order_by("-id")
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    def get(self,request):
+        if request.user.is_authenticated:
+            room_id = self.request.query_params.get("room_id")
+            is_available = self.request.query_params.get("is_available")
+            data = []
+            if room_id:
+                slot = Slot.objects.filter(room_id=room_id).order_by("-id")
+                for i in slot:
+                    response = {"id":i.id,
+                                "user_id":i.created_by.id,
+                                "room_id":i.room.id,
+                                "start_date":i.start_time,
+                                "end_date":i.end_time,
+                                "is_available":i.is_available}
+                    data.append(response)
+                return JsonResponse(data, safe=False)
+            if is_available:
+                slot = Slot.objects.filter(is_available=is_available).order_by("-id")
+                for i in slot:
+                    response = {"id":i.id,
+                                "user_id":i.created_by.id,
+                                "room_id":i.room.id,
+                                "start_date":i.start_time,
+                                "end_date":i.end_time,
+                                "is_available":i.is_available}
+                    data.append(response)
+                return JsonResponse(data, safe=False)
+            else:
+                slot = Slot.objects.all().order_by("-id")
+                for i in slot:
+                    response = {"id":i.id,
+                                "user_id":i.created_by.id,
+                                "room_id":i.room.id,
+                                "start_date":i.start_time,
+                                "end_date":i.end_time,
+                                "is_available":i.is_available}
+                    data.append(response)
+                return JsonResponse(data, safe=False)
+        else:
+            return JsonResponse({"message":"you are not authorized!!!"},status=status.HTTP_401_UNAUTHORIZED)
+        
+class SlotDetailView(APIView):
+    authentication_classes = [authentication.TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
     
-    def get_queryset(self):
-        queryset = self.queryset
-        return User.objects.all().exclude(id=self.request.user.id).order_by("-id")
+    def get(self,request,pk):
+        if request.user.is_authenticated:
+            slot = Slot.objects.filter(pk=pk)
+            if slot:
+                return JsonResponse({"id":slot[0].id,
+                                    "user_id":slot[0].created_by.id,
+                                    "room_id":slot[0].room.id,
+                                    "start_time":slot[0].start_time,
+                                    "end_time":slot[0].end_time,
+                                    "is_available":slot[0].is_available})
+            else:
+                return JsonResponse({"message":"No slots available"})
+        else:
+            return JsonResponse({"message":"you are not authorized!!!"},status=status.HTTP_401_UNAUTHORIZED)
+        
+    def delete(self,request,pk):
+        if request.user.is_authenticated:
+            if request.user.is_admin == True:
+                slot = Slot.objects.get(pk=pk)
+                if slot:
+                    slot.delete()
+                    return JsonResponse({"message":"Slot deleted successfully"}, status= status.HTTP_204_NO_CONTENT)
+                else:
+                    return JsonResponse({"message":"Slot does not exist."})
+            else:
+                return JsonResponse({"message":"You are not authorized to delete this slot."},status = status.HTTP_401_UNAUTHORIZED)
+        else:
+            return JsonResponse({"message":"You are not authorize!"}, status= status.HTTP_401_UNAUTHORIZED)
+        
+    def put(self,request,pk):
+        if request.user.is_authenticated:
+            room_id = request.data.get("room_id")
+            start_time = request.data.get("start_time")
+            end_time = request.data.get("end_time")
+            if request.user.is_admin == True:
+                if start_time >= end_time:
+                    return JsonResponse({"message":"start time cannot be greater then end time"})
+                else:
+                    today_date = date.today().strftime("%Y-%m-%d")
+                    slots = Slot.objects.filter(pk=pk,created_date=today_date,room_id=room_id,start_time__gte=start_time, end_time__lte=end_time)
+                    if len(slots) != 0:
+                        return JsonResponse({"message": "Time slot overlapping for the room"}, status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        user = User.objects.filter(id=request.user.id)
+                        if user[0]:
+                            my_room = Room.objects.filter(id=room_id)
+                            slots = Slot.objects.filter(pk=pk)
+                            if slots:
+                                slots.update(room=my_room[0],start_time=start_time,end_time=end_time,created_date=today_date)
+                                return JsonResponse({"id":slots[0].id,
+                                                     "user_id":slots[0].created_by.id,
+                                                     "room_id":slots[0].room.id,
+                                                     "start_date":slots[0].start_time,
+                                                     "end_date":slots[0].end_time,
+                                                     "is_available":slots[0].is_available,
+                                                     "message":"slot updated successfully"},status=status.HTTP_201_CREATED)
+                            else:
+                                return JsonResponse({"message":"Slot does not exist."})
+                        else:
+                            return JsonResponse({"message":"you don't have permission to book this room"})
+            else:
+                return JsonResponse({"message":"you are not authorize to update this slots"},status=status.HTTP_401_UNAUTHORIZED)
+        else:
+            return JsonResponse({"message":"you are not authorized!!!"},status=status.HTTP_401_UNAUTHORIZED)
+        
+        
+class SlotBookView(APIView):
+    authentication_classes = [authentication.TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self,request):
+        if request.user.is_authenticated:
+            room_id = request.data.get("room_id")
+            slot_id = request.data.get("slot_id")
+            if request.user.is_admin == False:
+                slot = Slot.objects.filter(id=slot_id, room_id=room_id, is_available=True)
+                if slot:
+                    slot.update(is_available=False,booked_by=request.user.id)
+                    return JsonResponse({"message":"slot booked successfully"}, status=status.HTTP_201_CREATED)
+                else:
+                    return JsonResponse({"message":"Slot does not exist"})
+            else:
+                return JsonResponse({"message":"you are not authorized to book this slot"},status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return JsonResponse({"message":"you are not authorized!!!"},status=status.HTTP_401_UNAUTHORIZED)
+        
+class SlotCancleView(APIView):
+    authentication_classes = [authentication.TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self,request):
+        if request.user.is_authenticated:
+            room_id = request.data.get("room_id")
+            slot_id = request.data.get("slot_id")
+            if request.user.is_admin == False:
+                slot = Slot.objects.filter(id=slot_id, room_id=room_id, is_available=False)
+                if slot:
+                    slot.update(is_available=True,booked_by=None)
+                    return JsonResponse({"message":"slot booked cancelled successfully"}, status=status.HTTP_204_NO_CONTENT)
+                else:
+                    return JsonResponse({"message":"Slot does not exist."})
+            else:
+                return JsonResponse({"message":"you are not authorized to book this slot"},status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return JsonResponse({"message":"you are not authorized!!!"},status=status.HTTP_401_UNAUTHORIZED) 
