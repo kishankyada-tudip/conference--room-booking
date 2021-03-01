@@ -172,7 +172,7 @@ class SlotView(APIView):
                         else:
                             return JsonResponse({"message":"you don't have permission to book this room"})
             else:
-                return JsonResponse({"message":"you are not authorize to create this slot"},status=status.HTTP_401_UNAUTHORIZED)
+                return JsonResponse({"message":"Employee can't create this slot"},status=status.HTTP_401_UNAUTHORIZED)
         else:
             return JsonResponse({"message":"you are not authorized!!!"},status=status.HTTP_401_UNAUTHORIZED)
         
@@ -238,7 +238,7 @@ class SlotDetailView(APIView):
                 else:
                     return JsonResponse({"message":"Slot does not exist."})
             else:
-                return JsonResponse({"message":"You are not authorized to delete this slot."},status = status.HTTP_401_UNAUTHORIZED)
+                return JsonResponse({"message":"Employee can't delete this slot."},status = status.HTTP_401_UNAUTHORIZED)
         else:
             return JsonResponse({"message":"You are not authorize!"}, status= status.HTTP_401_UNAUTHORIZED)
         
@@ -274,7 +274,7 @@ class SlotDetailView(APIView):
                         else:
                             return JsonResponse({"message":"you don't have permission to book this room"})
             else:
-                return JsonResponse({"message":"you are not authorize to update this slots"},status=status.HTTP_401_UNAUTHORIZED)
+                return JsonResponse({"message":"Employee can't update this slots"},status=status.HTTP_401_UNAUTHORIZED)
         else:
             return JsonResponse({"message":"you are not authorized!!!"},status=status.HTTP_401_UNAUTHORIZED)
         
