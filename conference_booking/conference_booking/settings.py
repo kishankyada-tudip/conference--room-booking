@@ -40,7 +40,6 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'rest_framework',
     'booking.apps.BookingConfig',
-    'rest_framework_swagger',
 ]
 
 REST_FRAMEWORK = {

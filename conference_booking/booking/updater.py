@@ -11,10 +11,11 @@ def start():
     scheduler.start()
 
 def TimeSlots():
-    slot = Slot.objects.filter(is_available=False)
+    slot = Slot.objects.filter(is_available=False,booked_by__isnull=False)
     for i in slot:
         if i.end_time <= now:
             i.is_available = True
+            i.booked_by = None
             i.save()
             with open("conference_booking_slot.csv", mode='w') as f:
                 fieldnames = ['Room name', 'Start time', 'End time']

@@ -132,7 +132,7 @@ class RoomDetailView(APIView):
                 else:
                     return JsonResponse({"message":"room does not exist"})
             else:
-                return JsonResponse({"message":"You are not authorized to delete this room."},status = status.HTTP_401_UNAUTHORIZED)
+                return JsonResponse({"message":"You are not authorized to update this room."},status = status.HTTP_401_UNAUTHORIZED)
         else:
             return JsonResponse({"message":"You are not authorize!"}, status= status.HTTP_401_UNAUTHORIZED)
         
@@ -148,7 +148,7 @@ class SlotView(APIView):
             
             if request.user.is_admin == True:
                 if start_time >= end_time:
-                    return JsonResponse({"message":"start time cannot be greater then end time"})
+                    return JsonResponse({"message":"End time should not be less than start time."})
                 else:
                     today_date = date.today().strftime("%Y-%m-%d")
                     slot = Slot.objects.filter(created_date=today_date,room_id=room_id,start_time__lte=start_time, end_time__gte=end_time)
@@ -163,8 +163,8 @@ class SlotView(APIView):
                                 return JsonResponse({"id":slots.id,
                                                      "user_id":slots.created_by.id,
                                                      "room_id":slots.room.id,
-                                                     "start_date":slots.start_time,
-                                                     "end_date":slots.end_time,
+                                                     "start_time":slots.start_time,
+                                                     "end_time":slots.end_time,
                                                      "is_available":slots.is_available,
                                                      "message":"room booked successfully"},status=status.HTTP_201_CREATED)
                             else:
@@ -181,36 +181,28 @@ class SlotView(APIView):
             room_id = self.request.query_params.get("room_id")
             is_available = self.request.query_params.get("is_available")
             data = []
-            if room_id:
-                slot = Slot.objects.filter(room_id=room_id).order_by("-id")
-                for i in slot:
-                    response = {"id":i.id,
-                                "user_id":i.created_by.id,
-                                "room_id":i.room.id,
-                                "start_date":i.start_time,
-                                "end_date":i.end_time,
-                                "is_available":i.is_available}
-                    data.append(response)
-                return JsonResponse(data, safe=False)
-            if is_available:
-                slot = Slot.objects.filter(is_available=is_available).order_by("-id")
-                for i in slot:
-                    response = {"id":i.id,
-                                "user_id":i.created_by.id,
-                                "room_id":i.room.id,
-                                "start_date":i.start_time,
-                                "end_date":i.end_time,
-                                "is_available":i.is_available}
-                    data.append(response)
-                return JsonResponse(data, safe=False)
+            if room_id or is_available:
+                slot = Slot.objects.filter(room_id=room_id,is_available=is_available).order_by("-id")
+                if slot:
+                    for i in slot:
+                        response = {"id":i.id,
+                                    "user_id":i.created_by.id,
+                                    "room_id":i.room.id,
+                                    "start_time":i.start_time,
+                                    "end_time":i.end_time,
+                                    "is_available":i.is_available}
+                        data.append(response)
+                    return JsonResponse(data, safe=False)
+                else:
+                    return JsonResponse({"message":"No slots available."})
             else:
                 slot = Slot.objects.all().order_by("-id")
                 for i in slot:
                     response = {"id":i.id,
                                 "user_id":i.created_by.id,
                                 "room_id":i.room.id,
-                                "start_date":i.start_time,
-                                "end_date":i.end_time,
+                                "start_time":i.start_time,
+                                "end_time":i.end_time,
                                 "is_available":i.is_available}
                     data.append(response)
                 return JsonResponse(data, safe=False)
@@ -260,7 +252,7 @@ class SlotDetailView(APIView):
                     return JsonResponse({"message":"start time cannot be greater then end time"})
                 else:
                     today_date = date.today().strftime("%Y-%m-%d")
-                    slots = Slot.objects.filter(pk=pk,created_date=today_date,room_id=room_id,start_time__gte=start_time, end_time__lte=end_time)
+                    slots = Slot.objects.filter(pk=pk,created_date=today_date,room_id=room_id,start_time__lte=start_time, end_time__gte=end_time)
                     if len(slots) != 0:
                         return JsonResponse({"message": "Time slot overlapping for the room"}, status=status.HTTP_400_BAD_REQUEST)
                     else:
@@ -273,8 +265,8 @@ class SlotDetailView(APIView):
                                 return JsonResponse({"id":slots[0].id,
                                                      "user_id":slots[0].created_by.id,
                                                      "room_id":slots[0].room.id,
-                                                     "start_date":slots[0].start_time,
-                                                     "end_date":slots[0].end_time,
+                                                     "start_time":slots[0].start_time,
+                                                     "end_time":slots[0].end_time,
                                                      "is_available":slots[0].is_available,
                                                      "message":"slot updated successfully"},status=status.HTTP_201_CREATED)
                             else:
@@ -303,7 +295,7 @@ class SlotBookView(APIView):
                 else:
                     return JsonResponse({"message":"Slot does not exist"})
             else:
-                return JsonResponse({"message":"you are not authorized to book this slot"},status=status.HTTP_400_BAD_REQUEST)
+                return JsonResponse({"message":"Admin can't book a slot"},status=status.HTTP_400_BAD_REQUEST)
         else:
             return JsonResponse({"message":"you are not authorized!!!"},status=status.HTTP_401_UNAUTHORIZED)
         
@@ -323,6 +315,6 @@ class SlotCancleView(APIView):
                 else:
                     return JsonResponse({"message":"Slot does not exist."})
             else:
-                return JsonResponse({"message":"you are not authorized to book this slot"},status=status.HTTP_400_BAD_REQUEST)
+                return JsonResponse({"message":"Admin can't unbooke a slot"},status=status.HTTP_400_BAD_REQUEST)
         else:
             return JsonResponse({"message":"you are not authorized!!!"},status=status.HTTP_401_UNAUTHORIZED) 

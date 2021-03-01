@@ -44,4 +44,4 @@ class Slot(models.Model):
     created_date = models.DateField(auto_now_add=True)
     start_time = models.TimeField(blank=True, null=True)
     end_time = models.TimeField(blank=True, null=True)
-    is_available = models.BooleanField(default=False, null=False, blank=False)
+    is_available = models.BooleanField(default=True, null=False, blank=False)
