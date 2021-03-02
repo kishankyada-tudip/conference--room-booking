@@ -181,22 +181,15 @@ class SlotView(APIView):
             room_id = self.request.query_params.get("room_id")
             is_available = self.request.query_params.get("is_available")
             data = []
-            if room_id or is_available:
+            if room_id and is_available:
                 slot = Slot.objects.filter(room_id=room_id,is_available=is_available).order_by("-id")
-                if slot:
-                    for i in slot:
-                        response = {"id":i.id,
-                                    "user_id":i.created_by.id,
-                                    "room_id":i.room.id,
-                                    "start_time":i.start_time,
-                                    "end_time":i.end_time,
-                                    "is_available":i.is_available}
-                        data.append(response)
-                    return JsonResponse(data, safe=False)
-                else:
-                    return JsonResponse({"message":"No slots available."})
+            elif room_id:
+                slot = Slot.objects.filter(room_id=room_id).order_by("-id")
+            elif is_available:
+                slot = Slot.objects.filter(is_available=is_available).order_by("-id")
             else:
                 slot = Slot.objects.all().order_by("-id")
+            if slot:
                 for i in slot:
                     response = {"id":i.id,
                                 "user_id":i.created_by.id,
@@ -206,6 +199,8 @@ class SlotView(APIView):
                                 "is_available":i.is_available}
                     data.append(response)
                 return JsonResponse(data, safe=False)
+            else:
+                return JsonResponse({"message":"No slots available."})
         else:
             return JsonResponse({"message":"you are not authorized!!!"},status=status.HTTP_401_UNAUTHORIZED)
         
