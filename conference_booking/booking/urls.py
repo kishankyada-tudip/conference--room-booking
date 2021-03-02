@@ -5,7 +5,7 @@ from booking.views import UserRegisterApi,LoginView,LogoutApi,RoomView,RoomDetai
 app_name = 'booking'
 
 urlpatterns = [
-    path('signup', UserRegisterApi.as_view(), name='signup'),
+    path('signup', UserRegisterApi.as_view(), name="signup"),
     path('login', LoginView.as_view(), name="login"),
     path('logout', LogoutApi.as_view(), name="logout"),
     
